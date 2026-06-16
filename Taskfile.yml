@@ -40,3 +40,40 @@ tasks:
     desc: "Run Rust Demo Plugin inside WSL Linux"
     cmds:
       - wsl /home/merak/.rustup/toolchains/stable-aarch64-unknown-linux-gnu/bin/cargo run --manifest-path rust/Cargo.toml --bin ringbuf-rust -- --role Plugin --path /tmp/temp_shm
+
+  py:test:
+    desc: "Run Python package unit tests on Windows"
+    dir: python/ringbuf_py
+    cmds:
+      - uv run pytest
+
+  py:test-wsl:
+    desc: "Run Python package unit tests inside WSL Linux"
+    dir: python/ringbuf_py
+    cmds:
+      - wsl sh -c "export UV_PROJECT_ENVIRONMENT=../.venv_wsl && /home/merak/.local/bin/uv run pytest"
+
+  demo:host-py:
+    desc: "Run Python Demo Host on Windows"
+    dir: python/ringbuf_py
+    cmds:
+      - uv run --no-sync python -m ringbuf_py_demo.main --role Host --path temp_shm
+
+  demo:plugin-py:
+    desc: "Run Python Demo Plugin on Windows"
+    dir: python/ringbuf_py
+    cmds:
+      - uv run --no-sync python -m ringbuf_py_demo.main --role Plugin --path temp_shm
+
+  demo:host-py-wsl:
+    desc: "Run Python Demo Host inside WSL Linux"
+    dir: python/ringbuf_py
+    cmds:
+      - wsl sh -c "export UV_PROJECT_ENVIRONMENT=../.venv_wsl && /home/merak/.local/bin/uv run --no-sync python -m ringbuf_py_demo.main --role Host --path /tmp/temp_shm"
+
+  demo:plugin-py-wsl:
+    desc: "Run Python Demo Plugin inside WSL Linux"
+    dir: python/ringbuf_py
+    cmds:
+      - wsl sh -c "export UV_PROJECT_ENVIRONMENT=../.venv_wsl && /home/merak/.local/bin/uv run --no-sync python -m ringbuf_py_demo.main --role Plugin --path /tmp/temp_shm"
+

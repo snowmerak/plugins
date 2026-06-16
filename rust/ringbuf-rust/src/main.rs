@@ -28,8 +28,8 @@ fn main() -> std::io::Result<()> {
 		role,
 		4,
 		1024,
-		Duration::from_secs(5),
-		Duration::from_secs(5),
+		Duration::from_secs(15),
+		Duration::from_secs(15),
 	)?;
 
 	if role == "Host" {

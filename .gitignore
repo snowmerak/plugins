@@ -13,3 +13,11 @@ temp_shm*
 # OS files
 .DS_Store
 Thumbs.db
+
+# Python virtual environments and caches
+.venv/
+.venv_wsl/
+__pycache__/
+*.pyc
+.pytest_cache/
+

@@ -24,8 +24,8 @@ func main() {
 		role,
 		4,
 		1024,
-		5*time.Second,
-		5*time.Second,
+		15*time.Second,
+		15*time.Second,
 	)
 	if err != nil {
 		log.Fatalf("failed to create connection: %v", err)
