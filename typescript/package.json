@@ -1,0 +1,8 @@
+{
+  "name": "typescript-monorepo-root",
+  "private": true,
+  "workspaces": [
+    "ringbuf-ts",
+    "ringbuf-ts-demo"
+  ]
+}

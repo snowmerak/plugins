@@ -43,6 +43,16 @@ A cross-platform, high-performance memory-mapped shared memory ringbuffer packag
 │       │   └── main.py     # Python CLI demo
 │       └── tests/
 │           └── test_ringbuf.py # pytest unit tests
+├── typescript/
+│   ├── package.json        # NPM workspace configuration
+│   ├── ringbuf-ts/         # TypeScript ringbuffer library
+│   │   ├── package.json
+│   │   ├── tsconfig.json
+│   │   ├── src/            # ringbuf.ts and index.ts
+│   │   └── tests/          # Unit tests
+│   └── ringbuf-ts-demo/    # TypeScript CLI demo
+│       ├── package.json
+│       └── src/            # main.ts
 ├── go.work                 # Go workspace definition
 ├── Taskfile.yml            # Task orchestrator configuration
 ├── .gitignore              # Monorepo ignore rules
@@ -51,7 +61,7 @@ A cross-platform, high-performance memory-mapped shared memory ringbuffer packag
 
 ## Running Tasks (via Taskfile)
 
-We use `task` (Taskfile) to manage test and run commands across Go, Rust, and Python.
+We use `task` (Taskfile) to manage test and run commands across Go, Rust, Python, and TypeScript.
 
 ### Windows (Natively)
 
@@ -64,6 +74,12 @@ task rust:build
 
 # Run Python unit tests (Windows skips UNIX socket tests)
 task py:test
+
+# Run TypeScript unit tests (Windows skips UNIX socket tests)
+task ts:test
+
+# Run TypeScript Demo Host
+task demo:host-ts
 
 # Run Go Host Demo
 task demo:host-go
@@ -95,6 +111,12 @@ task demo:plugin-rust-wsl
 
 # Run Python Plugin Demo inside WSL
 task demo:plugin-py-wsl
+
+# Run TypeScript unit tests inside WSL
+task ts:test-wsl
+
+# Run TypeScript Plugin Demo inside WSL
+task demo:plugin-ts-wsl
 ```
 
 ## Benchmarks

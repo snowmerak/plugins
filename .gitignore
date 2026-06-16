@@ -21,3 +21,9 @@ __pycache__/
 *.pyc
 .pytest_cache/
 
+# Node/TypeScript
+node_modules/
+dist/
+*tsconfig.tsbuildinfo
+
+

@@ -77,3 +77,29 @@ tasks:
     cmds:
       - wsl sh -c "export UV_PROJECT_ENVIRONMENT=../.venv_wsl && /home/merak/.local/bin/uv run --no-sync python -m ringbuf_py_demo.main --role Plugin --path /tmp/temp_shm"
 
+  ts:test:
+    desc: "Run TypeScript package unit tests on Windows"
+    dir: typescript/ringbuf-ts
+    cmds:
+      - npm run build
+      - npm test
+
+  ts:test-wsl:
+    desc: "Run TypeScript package unit tests inside WSL Linux"
+    dir: typescript/ringbuf-ts
+    cmds:
+      - wsl sh -c "export PATH=/home/linuxbrew/.linuxbrew/bin:/usr/bin:/bin && npm run build && npm test"
+
+  demo:host-ts:
+    desc: "Run TypeScript Demo Host on Windows"
+    dir: typescript/ringbuf-ts-demo
+    cmds:
+      - npm run start -- --role Host --path temp_shm
+
+  demo:plugin-ts-wsl:
+    desc: "Run TypeScript Demo Plugin inside WSL Linux"
+    dir: typescript/ringbuf-ts-demo
+    cmds:
+      - wsl sh -c "export PATH=/home/linuxbrew/.linuxbrew/bin:/usr/bin:/bin && npm run start -- --role Plugin --path /tmp/temp_shm"
+
+
