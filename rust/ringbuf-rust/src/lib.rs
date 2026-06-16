@@ -95,11 +95,10 @@ impl RingBuffer {
 				let elapsed = start.elapsed();
 				if elapsed >= timeout {
 					writer_waiting_ptr.store(0, Ordering::SeqCst);
-					let idx = self.write_index;
 					self.write_index = (self.write_index + 1) % self.num_slots;
 					return Err(io::Error::new(
 						io::ErrorKind::TimedOut,
-						format!("write timeout on slot {} waiting for empty signal", idx),
+						format!("write timeout on slot {} waiting for empty signal", self.write_index),
 					));
 				}
 				sig_conn.set_read_timeout(Some(timeout - elapsed))?;

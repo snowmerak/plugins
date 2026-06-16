@@ -1,0 +1,5 @@
+[workspace]
+members = [
+    "ringbuf-rust"
+]
+resolver = "2"

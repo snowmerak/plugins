@@ -1,6 +1,6 @@
 # plugins
 
-A cross-platform, high-performance memory-mapped shared memory ringbuffer package written in Go for host-plugin communications.
+A cross-platform, high-performance memory-mapped shared memory ringbuffer package written in Go and Rust for host-plugin communications, structured as a monorepo.
 
 ## Features
 
@@ -13,21 +13,63 @@ A cross-platform, high-performance memory-mapped shared memory ringbuffer packag
 ## Directory Structure
 
 ```
-├── ringbuf/
-│   ├── ringbuf.go          # Core logic, Reader/Writer implementation, and Connection setup
-│   ├── ringbuf_unix.go     # POSIX mmap implementation (build tagged for !windows)
-│   ├── ringbuf_windows.go  # Win32 file mapping implementation (build tagged for windows)
-│   └── ringbuf_test.go     # Test suite & benchmarks
-├── ringbuf-rust/           # Rust implementation of the ringbuffer
-│   ├── Cargo.toml          # Cargo dependencies (memmap2, uds_windows)
-│   └── src/
-│       ├── lib.rs          # Rust ringbuffer core logic (Writer/Reader/Atomic layout)
-│       └── main.rs         # Rust demo binary (Host/Plugin role handler)
-├── ringbuf-go-demo/
-│   └── main.go             # Go demo binary (Host/Plugin role handler)
-├── go.mod
-├── .gitignore              # Consolidated ignore patterns for Go, Rust, and OS files
+├── go/
+│   ├── ringbuf/            # Go ringbuffer implementation
+│   │   ├── go.mod
+│   │   ├── ringbuf.go
+│   │   ├── ringbuf_unix.go
+│   │   ├── ringbuf_windows.go
+│   │   └── ringbuf_test.go
+│   └── ringbuf-go-demo/    # Go demo CLI binary
+│       ├── go.mod
+│       └── main.go
+├── rust/
+│   ├── Cargo.toml          # Cargo workspace configuration
+│   └── ringbuf-rust/       # Rust ringbuffer library & CLI binary
+│       ├── Cargo.toml
+│       └── src/
+│           ├── lib.rs
+│           └── main.rs
+├── go.work                 # Go workspace definition
+├── Taskfile.yml            # Task orchestrator configuration
+├── .gitignore              # Monorepo ignore rules
 └── README.md
+```
+
+## Running Tasks (via Taskfile)
+
+We use `task` (Taskfile) to manage test and run commands across Go and Rust.
+
+### Windows (Natively)
+
+```bash
+# Run Go unit tests
+task go:test
+
+# Run Rust workspace build
+task rust:build
+
+# Run Go Host Demo
+task demo:host-go
+
+# Run Rust Plugin Demo
+task demo:plugin-rust
+```
+
+### Linux (WSL)
+
+```bash
+# Run Go unit tests inside WSL
+task go:test-wsl
+
+# Run Rust workspace build inside WSL
+task rust:build-wsl
+
+# Run Go Host Demo inside WSL
+task demo:host-go-wsl
+
+# Run Rust Plugin Demo inside WSL
+task demo:plugin-rust-wsl
 ```
 
 ## Benchmarks
@@ -49,58 +91,3 @@ Benchmarks measure throughput for bidirectional communication using a 1KB messag
   ```
   BenchmarkConnection_WriteRead-8    765952   1375.0 ns/op   1024 B/op   1 allocs/op
   ```
-
-## Running Tests & Benchmarks
-
-### Windows (Natively)
-
-```bash
-# Run tests
-go test -v ./ringbuf
-
-# Run benchmarks
-go test -bench=BenchmarkConnection_WriteRead -benchmem ./ringbuf
-```
-
-### Linux (WSL)
-
-```bash
-# Run tests
-wsl /home/linuxbrew/.linuxbrew/bin/go test -v ./ringbuf
-
-# Run benchmarks
-wsl /home/linuxbrew/.linuxbrew/bin/go test -bench=BenchmarkConnection_WriteRead -benchmem ./ringbuf
-```
-
-## Go <-> Rust Cross-Language IPC Demo
-
-We provide demo binaries in both Go and Rust to verify real-time, cross-language communication via the memory-mapped ring buffer and UNIX domain sockets.
-
-### Run on Windows (Natively)
-
-Open two terminal windows from the root directory:
-
-**Terminal 1 (Go Host):**
-```bash
-go run ringbuf-go-demo/main.go --role Host --path temp_shm
-```
-
-**Terminal 2 (Rust Plugin):**
-```bash
-cargo run --manifest-path ringbuf-rust/Cargo.toml -- --role Plugin --path temp_shm
-```
-
-### Run on Linux (WSL)
-
-Open two terminal windows from the root directory:
-
-**Terminal 1 (Go Host):**
-```bash
-wsl /home/linuxbrew/.linuxbrew/bin/go run ringbuf-go-demo/main.go --role Host --path /tmp/temp_shm
-```
-
-**Terminal 2 (Rust Plugin):**
-```bash
-wsl /home/merak/.rustup/toolchains/stable-aarch64-unknown-linux-gnu/bin/cargo run --manifest-path ringbuf-rust/Cargo.toml -- --role Plugin --path /tmp/temp_shm
-```
-

@@ -1,0 +1,42 @@
+version: '3'
+
+tasks:
+  go:test:
+    desc: "Run Go package unit tests on Windows"
+    cmds:
+      - go test -v ./go/ringbuf
+
+  go:test-wsl:
+    desc: "Run Go package unit tests inside WSL Linux"
+    cmds:
+      - wsl /home/linuxbrew/.linuxbrew/bin/go test -v ./go/ringbuf
+
+  rust:build:
+    desc: "Build Rust workspace on Windows"
+    cmds:
+      - cargo build --manifest-path rust/Cargo.toml
+
+  rust:build-wsl:
+    desc: "Build Rust workspace inside WSL Linux"
+    cmds:
+      - wsl /home/merak/.rustup/toolchains/stable-aarch64-unknown-linux-gnu/bin/cargo build --manifest-path rust/Cargo.toml
+
+  demo:host-go:
+    desc: "Run Go Demo Host on Windows"
+    cmds:
+      - go run go/ringbuf-go-demo/main.go --role Host --path temp_shm
+
+  demo:plugin-rust:
+    desc: "Run Rust Demo Plugin on Windows"
+    cmds:
+      - cargo run --manifest-path rust/Cargo.toml --bin ringbuf-rust -- --role Plugin --path temp_shm
+
+  demo:host-go-wsl:
+    desc: "Run Go Demo Host inside WSL Linux"
+    cmds:
+      - wsl /home/linuxbrew/.linuxbrew/bin/go run go/ringbuf-go-demo/main.go --role Host --path /tmp/temp_shm
+
+  demo:plugin-rust-wsl:
+    desc: "Run Rust Demo Plugin inside WSL Linux"
+    cmds:
+      - wsl /home/merak/.rustup/toolchains/stable-aarch64-unknown-linux-gnu/bin/cargo run --manifest-path rust/Cargo.toml --bin ringbuf-rust -- --role Plugin --path /tmp/temp_shm

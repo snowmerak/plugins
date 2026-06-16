@@ -1,9 +1,10 @@
 # Go build binaries
-/ringbuf-go-demo/ringbuf-go-demo
-/ringbuf-go-demo/ringbuf-go-demo.exe
+/go/ringbuf-go-demo/ringbuf-go-demo
+/go/ringbuf-go-demo/ringbuf-go-demo.exe
 
 # Rust build target directory
-/ringbuf-rust/target/
+/rust/target/
+/rust/ringbuf-rust/target/
 
 # Shared memory and UNIX socket files
 temp_shm*
