@@ -1,105 +1,78 @@
 version: '3'
 
 tasks:
+  test:
+    desc: "Run all unit tests across Go, Rust, Python, and TypeScript"
+    cmds:
+      - task: go:test
+      - task: rust:test
+      - task: py:test
+      - task: ts:test
+
   go:test:
-    desc: "Run Go package unit tests on Windows"
+    desc: "Run Go package unit tests"
     cmds:
       - go test -v ./go/ringbuf
 
-  go:test-wsl:
-    desc: "Run Go package unit tests inside WSL Linux"
-    cmds:
-      - wsl /home/linuxbrew/.linuxbrew/bin/go test -v ./go/ringbuf
-
   rust:build:
-    desc: "Build Rust workspace on Windows"
+    desc: "Build Rust workspace"
     cmds:
       - cargo build --manifest-path rust/Cargo.toml
 
-  rust:build-wsl:
-    desc: "Build Rust workspace inside WSL Linux"
+  rust:test:
+    desc: "Run Rust workspace unit tests"
     cmds:
-      - wsl /home/merak/.rustup/toolchains/stable-aarch64-unknown-linux-gnu/bin/cargo build --manifest-path rust/Cargo.toml
-
-  demo:host-go:
-    desc: "Run Go Demo Host on Windows"
-    cmds:
-      - go run go/ringbuf-go-demo/main.go --role Host --path temp_shm
-
-  demo:plugin-rust:
-    desc: "Run Rust Demo Plugin on Windows"
-    cmds:
-      - cargo run --manifest-path rust/Cargo.toml --bin ringbuf-rust -- --role Plugin --path temp_shm
-
-  demo:host-go-wsl:
-    desc: "Run Go Demo Host inside WSL Linux"
-    cmds:
-      - wsl /home/linuxbrew/.linuxbrew/bin/go run go/ringbuf-go-demo/main.go --role Host --path /tmp/temp_shm
-
-  demo:plugin-rust-wsl:
-    desc: "Run Rust Demo Plugin inside WSL Linux"
-    cmds:
-      - wsl /home/merak/.rustup/toolchains/stable-aarch64-unknown-linux-gnu/bin/cargo run --manifest-path rust/Cargo.toml --bin ringbuf-rust -- --role Plugin --path /tmp/temp_shm
+      - cargo test --manifest-path rust/Cargo.toml
 
   py:test:
-    desc: "Run Python package unit tests on Windows"
+    desc: "Run Python package unit tests"
     dir: python/ringbuf_py
     cmds:
       - uv run pytest
 
-  py:test-wsl:
-    desc: "Run Python package unit tests inside WSL Linux"
-    dir: python/ringbuf_py
+  ts:build:
+    desc: "Build TypeScript library"
+    dir: typescript/ringbuf-ts
     cmds:
-      - wsl sh -c "export UV_PROJECT_ENVIRONMENT=../.venv_wsl && /home/merak/.local/bin/uv run pytest"
+      - npm run build
+
+  ts:test:
+    desc: "Run TypeScript package unit tests"
+    dir: typescript/ringbuf-ts
+    cmds:
+      - task: ts:build
+      - npm test
+
+  demo:host-go:
+    desc: "Run Go Demo Host"
+    cmds:
+      - go run go/ringbuf-go-demo/main.go --role Host --path temp_shm
+
+  demo:plugin-rust:
+    desc: "Run Rust Demo Plugin"
+    cmds:
+      - cargo run --manifest-path rust/Cargo.toml --bin ringbuf-rust -- --role Plugin --path temp_shm
 
   demo:host-py:
-    desc: "Run Python Demo Host on Windows"
+    desc: "Run Python Demo Host"
     dir: python/ringbuf_py
     cmds:
       - uv run --no-sync python -m ringbuf_py_demo.main --role Host --path temp_shm
 
   demo:plugin-py:
-    desc: "Run Python Demo Plugin on Windows"
+    desc: "Run Python Demo Plugin"
     dir: python/ringbuf_py
     cmds:
       - uv run --no-sync python -m ringbuf_py_demo.main --role Plugin --path temp_shm
 
-  demo:host-py-wsl:
-    desc: "Run Python Demo Host inside WSL Linux"
-    dir: python/ringbuf_py
-    cmds:
-      - wsl sh -c "export UV_PROJECT_ENVIRONMENT=../.venv_wsl && /home/merak/.local/bin/uv run --no-sync python -m ringbuf_py_demo.main --role Host --path /tmp/temp_shm"
-
-  demo:plugin-py-wsl:
-    desc: "Run Python Demo Plugin inside WSL Linux"
-    dir: python/ringbuf_py
-    cmds:
-      - wsl sh -c "export UV_PROJECT_ENVIRONMENT=../.venv_wsl && /home/merak/.local/bin/uv run --no-sync python -m ringbuf_py_demo.main --role Plugin --path /tmp/temp_shm"
-
-  ts:test:
-    desc: "Run TypeScript package unit tests on Windows"
-    dir: typescript/ringbuf-ts
-    cmds:
-      - npm run build
-      - npm test
-
-  ts:test-wsl:
-    desc: "Run TypeScript package unit tests inside WSL Linux"
-    dir: typescript/ringbuf-ts
-    cmds:
-      - wsl sh -c "export PATH=/home/linuxbrew/.linuxbrew/bin:/usr/bin:/bin && npm run build && npm test"
-
   demo:host-ts:
-    desc: "Run TypeScript Demo Host on Windows"
+    desc: "Run TypeScript Demo Host"
     dir: typescript/ringbuf-ts-demo
     cmds:
       - npm run start -- --role Host --path temp_shm
 
-  demo:plugin-ts-wsl:
-    desc: "Run TypeScript Demo Plugin inside WSL Linux"
+  demo:plugin-ts:
+    desc: "Run TypeScript Demo Plugin"
     dir: typescript/ringbuf-ts-demo
     cmds:
-      - wsl sh -c "export PATH=/home/linuxbrew/.linuxbrew/bin:/usr/bin:/bin && npm run start -- --role Plugin --path /tmp/temp_shm"
-
-
+      - npm run start -- --role Plugin --path temp_shm

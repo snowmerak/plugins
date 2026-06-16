@@ -61,62 +61,57 @@ A cross-platform, high-performance memory-mapped shared memory ringbuffer packag
 
 ## Running Tasks (via Taskfile)
 
-We use `task` (Taskfile) to manage test and run commands across Go, Rust, Python, and TypeScript.
+We use `task` (Taskfile) to manage test, build, and run commands across Go, Rust, Python, and TypeScript.
+Run these commands inside your terminal. To execute the full integration suite and UNIX socket connection tests, run them inside a UNIX environment (macOS or Linux/WSL shell) where `AF_UNIX` sockets are natively supported by all runtimes.
 
-### Windows (Natively)
-
+### Run All Unit Tests
 ```bash
-# Run Go unit tests
-task go:test
-
-# Run Rust workspace build
-task rust:build
-
-# Run Python unit tests (Windows skips UNIX socket tests)
-task py:test
-
-# Run TypeScript unit tests (Windows skips UNIX socket tests)
-task ts:test
-
-# Run TypeScript Demo Host
-task demo:host-ts
-
-# Run Go Host Demo
-task demo:host-go
-
-# Run Rust Plugin Demo
-task demo:plugin-rust
-
-# Run Python Plugin Demo (Note: Windows lacks native AF_UNIX support in Python)
-task demo:plugin-py
+task test
 ```
 
-### Linux (WSL)
+### Run Language-Specific Tests & Builds
+```bash
+# Go
+task go:test
+
+# Rust
+task rust:build
+task rust:test
+
+# Python
+task py:test
+
+# TypeScript
+task ts:build
+task ts:test
+```
+
+### Run CLI Demos (Cross-Language IPC)
+To run the demo apps, launch one language as Host and another as Plugin, pointing to the same shared memory path:
 
 ```bash
-# Run Go unit tests inside WSL
-task go:test-wsl
+# Terminal 1: Run Go Host
+go run go/ringbuf-go-demo/main.go --role Host --path /tmp/temp_shm
 
-# Run Rust workspace build inside WSL
-task rust:build-wsl
+# Terminal 2: Run Rust Plugin
+cargo run --manifest-path rust/Cargo.toml --bin ringbuf-rust -- --role Plugin --path /tmp/temp_shm
+```
 
-# Run Python unit tests inside WSL (runs full test suite)
-task py:test-wsl
+The Taskfile also exposes shorthand task runners:
+```bash
+# Go
+task demo:host-go
 
-# Run Go Host Demo inside WSL
-task demo:host-go-wsl
+# Rust
+task demo:plugin-rust
 
-# Run Rust Plugin Demo inside WSL
-task demo:plugin-rust-wsl
+# Python
+task demo:host-py
+task demo:plugin-py
 
-# Run Python Plugin Demo inside WSL
-task demo:plugin-py-wsl
-
-# Run TypeScript unit tests inside WSL
-task ts:test-wsl
-
-# Run TypeScript Plugin Demo inside WSL
-task demo:plugin-ts-wsl
+# TypeScript
+task demo:host-ts
+task demo:plugin-ts
 ```
 
 ## Benchmarks
