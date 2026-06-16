@@ -1,0 +1,1 @@
+/mnt/c/Users/snowm/Projects/snowmerak/plugins/ringbuf-rust/target/debug/ringbuf-rust: /mnt/c/Users/snowm/Projects/snowmerak/plugins/ringbuf-rust/src/lib.rs /mnt/c/Users/snowm/Projects/snowmerak/plugins/ringbuf-rust/src/main.rs

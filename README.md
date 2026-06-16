@@ -18,6 +18,13 @@ A cross-platform, high-performance memory-mapped shared memory ringbuffer packag
 │   ├── ringbuf_unix.go     # POSIX mmap implementation (build tagged for !windows)
 │   ├── ringbuf_windows.go  # Win32 file mapping implementation (build tagged for windows)
 │   └── ringbuf_test.go     # Test suite & benchmarks
+├── ringbuf-rust/           # Rust implementation of the ringbuffer
+│   ├── Cargo.toml          # Cargo dependencies (memmap2, uds_windows)
+│   └── src/
+│       ├── lib.rs          # Rust ringbuffer core logic (Writer/Reader/Atomic layout)
+│       └── main.rs         # Rust demo binary (Host/Plugin role handler)
+├── ringbuf-go-demo/
+│   └── main.go             # Go demo binary (Host/Plugin role handler)
 ├── go.mod
 └── README.md
 ```
@@ -63,3 +70,36 @@ wsl /home/linuxbrew/.linuxbrew/bin/go test -v ./ringbuf
 # Run benchmarks
 wsl /home/linuxbrew/.linuxbrew/bin/go test -bench=BenchmarkConnection_WriteRead -benchmem ./ringbuf
 ```
+
+## Go <-> Rust Cross-Language IPC Demo
+
+We provide demo binaries in both Go and Rust to verify real-time, cross-language communication via the memory-mapped ring buffer and UNIX domain sockets.
+
+### Run on Windows (Natively)
+
+Open two terminal windows from the root directory:
+
+**Terminal 1 (Go Host):**
+```bash
+go run ringbuf-go-demo/main.go --role Host --path temp_shm
+```
+
+**Terminal 2 (Rust Plugin):**
+```bash
+cargo run --manifest-path ringbuf-rust/Cargo.toml -- --role Plugin --path temp_shm
+```
+
+### Run on Linux (WSL)
+
+Open two terminal windows from the root directory:
+
+**Terminal 1 (Go Host):**
+```bash
+wsl /home/linuxbrew/.linuxbrew/bin/go run ringbuf-go-demo/main.go --role Host --path /tmp/temp_shm
+```
+
+**Terminal 2 (Rust Plugin):**
+```bash
+wsl /home/merak/.rustup/toolchains/stable-aarch64-unknown-linux-gnu/bin/cargo run --manifest-path ringbuf-rust/Cargo.toml -- --role Plugin --path /tmp/temp_shm
+```
+

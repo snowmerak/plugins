@@ -1,0 +1,10 @@
+[package]
+name = "ringbuf-rust"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+memmap2 = "0.9.4"
+
+[target.'cfg(windows)'.dependencies]
+uds_windows = "1.1.0"
