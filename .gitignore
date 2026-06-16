@@ -1,0 +1,4 @@
+temp_shm*
+*_sig.sock
+ringbuf-go-demo/ringbuf-go-demo
+ringbuf-go-demo/ringbuf-go-demo.exe
