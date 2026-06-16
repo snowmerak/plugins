@@ -168,14 +168,15 @@ class RingBuffer:
                 self.set_reader_waiting(self.read_index, 0)
                 break
 
+            poll_timeout = 0.010
             if timeout > 0:
                 remaining = timeout - (time.time() - start)
                 if remaining <= 0:
                     self.set_reader_waiting(self.read_index, 0)
                     raise TimeoutError(f"read timeout on slot {self.read_index} waiting for write signal")
-                sig_conn.settimeout(remaining)
+                sig_conn.settimeout(min(remaining, poll_timeout))
             else:
-                sig_conn.settimeout(None)
+                sig_conn.settimeout(poll_timeout)
 
             try:
                 token = sig_conn.recv(1)
@@ -184,7 +185,8 @@ class RingBuffer:
                     raise ConnectionAbortedError("connection closed")
             except socket.timeout:
                 self.set_reader_waiting(self.read_index, 0)
-                raise TimeoutError(f"read timeout on slot {self.read_index} waiting for write signal")
+                flag_val = self.get_flag(self.read_index)
+                continue
             except Exception as e:
                 self.set_reader_waiting(self.read_index, 0)
                 raise e

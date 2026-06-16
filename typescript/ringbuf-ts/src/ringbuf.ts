@@ -249,6 +249,7 @@ export class SocketSignalManager {
 
     constructor(socket: net.Socket) {
         this.socket = socket;
+        this.socket.on('error', () => {}); // Prevent unhandled 'error' crash on ECONNRESET
         this.socket.on('data', (chunk) => {
             for (const byte of chunk) {
                 if (byte === 0x01) {

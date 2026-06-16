@@ -134,8 +134,8 @@ func (rb *ringBuffer) Write(payload []byte, seq uint64, timeout time.Duration, s
 	atomic.StoreUint32(rb.getLenPtr(rb.writeIndex), uint32(len(payload)))
 	atomic.StoreUint64(rb.getSeqPtr(rb.writeIndex), seq)
 
-	// Atomically mark as written
-	atomic.StoreUint32(flagPtr, StateWritten)
+	// Atomically mark as written (using Swap to enforce a full memory barrier on ARM64)
+	atomic.SwapUint32(flagPtr, StateWritten)
 
 	// Signal the reader if they are waiting
 	readerWaitingPtr := rb.getReaderWaitingPtr(rb.writeIndex)
@@ -166,18 +166,29 @@ func (rb *ringBuffer) Read(timeout time.Duration, sigConn net.Conn) ([]byte, uin
 			break
 		}
 
+		// Wait for signal with a 10ms polling fallback to prevent lost wakeups on weakly-ordered CPUs
+		pollTimeout := 10 * time.Millisecond
 		if timeout > 0 {
-			sigConn.SetReadDeadline(time.Now().Add(timeout - time.Since(start)))
-		} else {
-			sigConn.SetReadDeadline(time.Time{})
+			rem := timeout - time.Since(start)
+			if rem < pollTimeout {
+				pollTimeout = rem
+			}
 		}
+		sigConn.SetReadDeadline(time.Now().Add(pollTimeout))
+
 		var signalBuf [1]byte
 		_, err := sigConn.Read(signalBuf[:])
 
 		atomic.StoreUint32(readerWaitingPtr, 0)
 
 		if err != nil {
-			return nil, 0, fmt.Errorf("read timeout on slot %d waiting for write signal: %w", rb.readIndex, err)
+			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+				if timeout > 0 && time.Since(start) >= timeout {
+					return nil, 0, fmt.Errorf("read timeout on slot %d waiting for write signal", rb.readIndex)
+				}
+				continue
+			}
+			return nil, 0, err
 		}
 	}
 
@@ -192,8 +203,8 @@ func (rb *ringBuffer) Read(timeout time.Duration, sigConn net.Conn) ([]byte, uin
 	src := rb.getPayloadSlice(rb.readIndex)
 	copy(payload, src[:length])
 
-	// Mark as read/empty
-	atomic.StoreUint32(flagPtr, StateEmpty)
+	// Mark as read/empty (using Swap to enforce a full memory barrier on ARM64)
+	atomic.SwapUint32(flagPtr, StateEmpty)
 
 	// Signal the writer if they are waiting
 	writerWaitingPtr := rb.getWriterWaitingPtr(rb.readIndex)

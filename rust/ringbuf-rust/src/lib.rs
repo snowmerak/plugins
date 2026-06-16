@@ -159,6 +159,7 @@ impl RingBuffer {
 				break;
 			}
 
+			let poll_timeout = Duration::from_millis(10);
 			if timeout > Duration::ZERO {
 				let elapsed = start.elapsed();
 				if elapsed >= timeout {
@@ -168,9 +169,10 @@ impl RingBuffer {
 						format!("read timeout on slot {} waiting for write signal", self.read_index),
 					));
 				}
-				sig_conn.set_read_timeout(Some(timeout - elapsed))?;
+				let rem = timeout - elapsed;
+				sig_conn.set_read_timeout(Some(std::cmp::min(rem, poll_timeout)))?;
 			} else {
-				sig_conn.set_read_timeout(None)?;
+				sig_conn.set_read_timeout(Some(poll_timeout))?;
 			}
 
 			let mut buf = [0u8; 1];
@@ -182,6 +184,9 @@ impl RingBuffer {
 				Ok(_) => {}
 				Err(e) => {
 					reader_waiting_ptr.store(0, Ordering::SeqCst);
+					if e.kind() == io::ErrorKind::WouldBlock || e.kind() == io::ErrorKind::TimedOut {
+						continue;
+					}
 					return Err(e);
 				}
 			}
