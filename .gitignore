@@ -1,4 +1,14 @@
+# Go build binaries
+/ringbuf-go-demo/ringbuf-go-demo
+/ringbuf-go-demo/ringbuf-go-demo.exe
+
+# Rust build target directory
+/ringbuf-rust/target/
+
+# Shared memory and UNIX socket files
 temp_shm*
 *_sig.sock
-ringbuf-go-demo/ringbuf-go-demo
-ringbuf-go-demo/ringbuf-go-demo.exe
+
+# OS files
+.DS_Store
+Thumbs.db

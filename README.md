@@ -26,6 +26,7 @@ A cross-platform, high-performance memory-mapped shared memory ringbuffer packag
 ├── ringbuf-go-demo/
 │   └── main.go             # Go demo binary (Host/Plugin role handler)
 ├── go.mod
+├── .gitignore              # Consolidated ignore patterns for Go, Rust, and OS files
 └── README.md
 ```
 
