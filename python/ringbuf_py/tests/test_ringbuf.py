@@ -35,7 +35,7 @@ def local_socket_pair():
     return conn1, conn2
 
 def get_test_base_path(tmp_path):
-    if sys.platform != "win32" and str(tmp_path).startswith("/mnt/"):
+    if sys.platform == "darwin" or (sys.platform != "win32" and str(tmp_path).startswith("/mnt/")):
         import uuid
         return f"/tmp/shm_test_{uuid.uuid4().hex}"
     return str(tmp_path / "shm_comm")
