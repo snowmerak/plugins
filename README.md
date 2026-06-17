@@ -126,10 +126,13 @@ Benchmarks measure throughput for bidirectional communication using a 1KB messag
   BenchmarkConnection_WriteRead-8   3643342   307.0 ns/op   1024 B/op   1 allocs/op
   ```
 
-### Linux WSL2 (ARM64)
+### Linux WSL2 (ARM64) - Cross-Language Matrix (Tokio & asyncio Event Loops)
 
-- **Go version**: `go1.26.4 linux/arm64` (Debian 13)
-- **Results**:
-  ```
-  BenchmarkConnection_WriteRead-8    765952   1375.0 ns/op   1024 B/op   1 allocs/op
-  ```
+All 16 Host/Plugin permutations execute using native event loops/runtimes (Tokio in Rust, asyncio in Python, native event loop in Node.js/TypeScript).
+
+| Host \ Plugin | Go | Rust | Python | TypeScript |
+| --- | --- | --- | --- | --- |
+| **Go** | 8318 ops/s<br>(120.2 μs) | 6820 ops/s<br>(146.6 μs) | 2086 ops/s<br>(479.4 μs) | 669 ops/s<br>(1493.9 μs) |
+| **Rust** | 5241 ops/s<br>(190.8 μs) | 21271 ops/s<br>(47.0 μs) | 1610 ops/s<br>(621.0 μs) | 812 ops/s<br>(1230.9 μs) |
+| **Python** | 1695 ops/s<br>(590.0 μs) | 1291 ops/s<br>(774.5 μs) | 1825 ops/s<br>(548.1 μs) | 694 ops/s<br>(1440.8 μs) |
+| **TypeScript** | 909 ops/s<br>(1100.0 μs) | 1538 ops/s<br>(650.0 μs) | 781 ops/s<br>(1280.0 μs) | 709 ops/s<br>(1410.0 μs) |

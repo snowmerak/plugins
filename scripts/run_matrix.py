@@ -11,14 +11,14 @@ languages = {
         "env": None
     },
     "Rust": {
-        "args": ["./rust/target/debug/ringbuf-rust"],
+        "args": ["./rust/target/release/ringbuf-rust", "--async"],
         "cwd": None,
         "env": None
     },
     "Python": {
-        "args": ["/home/merak/.local/bin/uv", "run", "--no-sync", "python", "-m", "ringbuf_py_demo.main"],
+        "args": ["/mnt/c/Users/snowm/Projects/snowmerak/plugins/.venv_wsl/bin/python3", "-m", "ringbuf_py_demo.main", "--async"],
         "cwd": "python/ringbuf_py",
-        "env": lambda: dict(os.environ, UV_PROJECT_ENVIRONMENT="../.venv_wsl")
+        "env": None
     },
     "TypeScript": {
         "args": ["node", "--import", "tsx", "src/main.ts"],
@@ -57,7 +57,8 @@ for host_name, host_cfg in languages.items():
             stderr=subprocess.PIPE,
             text=True
         )
-        time.sleep(0.5)
+        # Allow more time for TypeScript and Python host startup
+        time.sleep(2.0 if host_name in ("TypeScript", "Python") else 0.5)
         
         # Launch Plugin in foreground with a 5-second timeout
         plugin_stdout = ""
@@ -78,7 +79,7 @@ for host_name, host_cfg in languages.items():
             plugin_stderr = e.stderr or ""
             print(f"  Plugin {plugin_name} timeout expired!", flush=True)
             # Kill leftover processes
-            subprocess.run("pkill -f -9 ringbuf-go-demo; pkill -f -9 ringbuf-rust; pkill -f -9 python; pkill -f -9 node", shell=True)
+            subprocess.run("pkill -f -9 ringbuf-go-demo; pkill -f -9 ringbuf-rust; pkill -f -9 ringbuf_py_demo; pkill -f -9 node", shell=True)
         
         # Wait for Host to finish with a 5-second timeout
         host_stdout = ""
@@ -94,7 +95,7 @@ for host_name, host_cfg in languages.items():
             host_stderr = stderr
             print(f"  Host {host_name} timeout expired!", flush=True)
             # Kill leftover processes
-            subprocess.run("pkill -f -9 ringbuf-go-demo; pkill -f -9 ringbuf-rust; pkill -f -9 python; pkill -f -9 node", shell=True)
+            subprocess.run("pkill -f -9 ringbuf-go-demo; pkill -f -9 ringbuf-rust; pkill -f -9 ringbuf_py_demo; pkill -f -9 node", shell=True)
         
         # Parse Host output for BENCHMARK_RESULT
         match = re.search(r"BENCHMARK_RESULT:\s*(\d+)\s+rounds,\s*total time:\s*[\d\.\w\s\-]+,\s*([\d\.]+)\s+ops/sec,\s*avg latency:\s*([\d\.]+)\s+us", host_stdout)

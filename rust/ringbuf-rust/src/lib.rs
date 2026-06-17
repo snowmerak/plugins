@@ -4,6 +4,7 @@ use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 use memmap2::MmapMut;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 const STATE_EMPTY: u32 = 0;
 const STATE_WRITTEN: u32 = 1;
@@ -252,6 +253,178 @@ impl RingBuffer {
 		let offset = slot * self.slot_size + 24;
 		&self.mmap[offset..offset + self.slot_data_size]
 	}
+
+	pub async fn write_async(
+		&mut self,
+		payload: &[u8],
+		seq: u64,
+		timeout: Duration,
+		sig_conn: &mut tokio::net::UnixStream,
+	) -> io::Result<()> {
+		if payload.len() > self.slot_data_size {
+			return Err(io::Error::new(
+				io::ErrorKind::InvalidInput,
+				format!("payload size {} exceeds slot capacity {}", payload.len(), self.slot_data_size),
+			));
+		}
+
+		let flag_ptr = self.get_flag_atomic(self.write_index);
+		let writer_waiting_ptr = self.get_writer_waiting_atomic(self.write_index);
+		let start = Instant::now();
+
+		while flag_ptr.load(Ordering::SeqCst) != STATE_EMPTY {
+			writer_waiting_ptr.store(1, Ordering::SeqCst);
+
+			if flag_ptr.load(Ordering::SeqCst) == STATE_EMPTY {
+				writer_waiting_ptr.store(0, Ordering::SeqCst);
+				break;
+			}
+
+			let mut buf = [0u8; 1];
+			let read_fut = sig_conn.read(&mut buf);
+
+			let res = if timeout > Duration::ZERO {
+				let elapsed = start.elapsed();
+				if elapsed >= timeout {
+					writer_waiting_ptr.store(0, Ordering::SeqCst);
+					self.write_index = (self.write_index + 1) % self.num_slots;
+					return Err(io::Error::new(
+						io::ErrorKind::TimedOut,
+						format!("write timeout on slot {} waiting for empty signal", self.write_index),
+					));
+				}
+				match tokio::time::timeout(timeout - elapsed, read_fut).await {
+					Ok(read_res) => read_res,
+					Err(_) => {
+						writer_waiting_ptr.store(0, Ordering::SeqCst);
+						self.write_index = (self.write_index + 1) % self.num_slots;
+						return Err(io::Error::new(
+							io::ErrorKind::TimedOut,
+							format!("write timeout on slot {} waiting for empty signal", self.write_index),
+						));
+					}
+				}
+			} else {
+				read_fut.await
+			};
+
+			match res {
+				Ok(0) => {
+					writer_waiting_ptr.store(0, Ordering::SeqCst);
+					return Err(io::Error::new(io::ErrorKind::ConnectionAborted, "connection closed"));
+				}
+				Ok(_) => {}
+				Err(e) => {
+					writer_waiting_ptr.store(0, Ordering::SeqCst);
+					self.write_index = (self.write_index + 1) % self.num_slots;
+					return Err(e);
+				}
+			}
+			writer_waiting_ptr.store(0, Ordering::SeqCst);
+		}
+
+		let slot_idx = self.write_index;
+		let dest = self.get_payload_slice_mut(slot_idx);
+		dest[..payload.len()].copy_from_slice(payload);
+
+		self.get_len_atomic(slot_idx).store(payload.len() as u32, Ordering::SeqCst);
+		self.get_seq_atomic(slot_idx).store(seq, Ordering::SeqCst);
+
+		flag_ptr.store(STATE_WRITTEN, Ordering::SeqCst);
+
+		let reader_waiting_ptr = self.get_reader_waiting_atomic(slot_idx);
+		if reader_waiting_ptr.compare_exchange(1, 0, Ordering::SeqCst, Ordering::SeqCst).is_ok() {
+			let token = [0x01u8];
+			let write_fut = sig_conn.write_all(&token);
+			if timeout > Duration::ZERO {
+				let _ = tokio::time::timeout(Duration::from_secs(1), write_fut).await;
+			} else {
+				let _ = write_fut.await;
+			}
+		}
+
+		self.write_index = (self.write_index + 1) % self.num_slots;
+		Ok(())
+	}
+
+	pub async fn read_async(
+		&mut self,
+		timeout: Duration,
+		sig_conn: &mut tokio::net::UnixStream,
+	) -> io::Result<(Vec<u8>, u64)> {
+		let flag_ptr = self.get_flag_atomic(self.read_index);
+		let reader_waiting_ptr = self.get_reader_waiting_atomic(self.read_index);
+		let start = Instant::now();
+
+		while flag_ptr.load(Ordering::SeqCst) != STATE_WRITTEN {
+			reader_waiting_ptr.store(1, Ordering::SeqCst);
+
+			if flag_ptr.load(Ordering::SeqCst) == STATE_WRITTEN {
+				reader_waiting_ptr.store(0, Ordering::SeqCst);
+				break;
+			}
+
+			let poll_timeout = Duration::from_millis(10);
+			let mut actual_timeout = poll_timeout;
+			if timeout > Duration::ZERO {
+				let elapsed = start.elapsed();
+				if elapsed >= timeout {
+					reader_waiting_ptr.store(0, Ordering::SeqCst);
+					return Err(io::Error::new(
+						io::ErrorKind::TimedOut,
+						format!("read timeout on slot {} waiting for write signal", self.read_index),
+					));
+				}
+				actual_timeout = std::cmp::min(timeout - elapsed, poll_timeout);
+			}
+
+			let mut buf = [0u8; 1];
+			let read_fut = sig_conn.read(&mut buf);
+			match tokio::time::timeout(actual_timeout, read_fut).await {
+				Ok(Ok(0)) => {
+					reader_waiting_ptr.store(0, Ordering::SeqCst);
+					return Err(io::Error::new(io::ErrorKind::ConnectionAborted, "connection closed"));
+				}
+				Ok(Ok(_)) => {}
+				Ok(Err(e)) => {
+					reader_waiting_ptr.store(0, Ordering::SeqCst);
+					return Err(e);
+				}
+				Err(_) => {
+					// Timeout/poll fallback
+				}
+			}
+			reader_waiting_ptr.store(0, Ordering::SeqCst);
+		}
+
+		let length = self.get_len_atomic(self.read_index).load(Ordering::SeqCst) as usize;
+		let seq = self.get_seq_atomic(self.read_index).load(Ordering::SeqCst);
+
+		if length > self.slot_data_size {
+			return Err(io::Error::new(
+				io::ErrorKind::InvalidData,
+				format!("invalid payload length {} on slot {}", length, self.read_index),
+			));
+		}
+
+		let payload = self.get_payload_slice(self.read_index)[..length].to_vec();
+
+		flag_ptr.store(STATE_EMPTY, Ordering::SeqCst);
+
+		let writer_waiting_ptr = self.get_writer_waiting_atomic(self.read_index);
+		if writer_waiting_ptr.compare_exchange(1, 0, Ordering::SeqCst, Ordering::SeqCst).is_ok() {
+			let token = [0x02u8];
+			let write_fut = sig_conn.write_all(&token);
+			if timeout > Duration::ZERO {
+				let _ = tokio::time::timeout(Duration::from_secs(1), write_fut).await;
+			} else {
+				let _ = write_fut.await;
+			}
+		}
+
+		self.read_index = (self.read_index + 1) % self.num_slots;
+		Ok((payload, seq))
+	}
 }
 
 pub struct Writer {
@@ -415,6 +588,177 @@ pub fn new_connection(
 		(
 			Writer::new(write_rb, conn2, write_timeout),
 			Reader::new(read_rb, conn1, read_timeout),
+		)
+	};
+
+	Ok((writer, reader))
+}
+
+pub struct AsyncWriter {
+	rb: RingBuffer,
+	sig_conn: tokio::net::UnixStream,
+	write_timeout: Duration,
+	next_write_seq: u64,
+	write_mu: tokio::sync::Mutex<()>,
+}
+
+impl AsyncWriter {
+	pub fn new(rb: RingBuffer, sig_conn: tokio::net::UnixStream, write_timeout: Duration) -> Self {
+		Self {
+			rb,
+			sig_conn,
+			write_timeout,
+			next_write_seq: 0,
+			write_mu: tokio::sync::Mutex::new(()),
+		}
+	}
+
+	pub async fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+		let _guard = self.write_mu.lock().await;
+
+		let total = buf.len();
+		let mut p = buf;
+
+		while !p.is_empty() {
+			let mut chunk_size = p.len();
+			if chunk_size > self.rb.slot_data_size {
+				chunk_size = self.rb.slot_data_size;
+			}
+
+			self.rb.write_async(&p[..chunk_size], self.next_write_seq, self.write_timeout, &mut self.sig_conn).await?;
+			self.next_write_seq += 1;
+			p = &p[chunk_size..];
+		}
+
+		Ok(total)
+	}
+}
+
+pub struct AsyncReader {
+	rb: RingBuffer,
+	sig_conn: tokio::net::UnixStream,
+	read_timeout: Duration,
+	read_buf: Vec<u8>,
+	read_mu: tokio::sync::Mutex<()>,
+}
+
+impl AsyncReader {
+	pub fn new(rb: RingBuffer, sig_conn: tokio::net::UnixStream, read_timeout: Duration) -> Self {
+		Self {
+			rb,
+			sig_conn,
+			read_timeout,
+			read_buf: Vec::new(),
+			read_mu: tokio::sync::Mutex::new(()),
+		}
+	}
+
+	pub async fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+		let _guard = self.read_mu.lock().await;
+
+		if buf.is_empty() {
+			return Ok(0);
+		}
+
+		if self.read_buf.is_empty() {
+			let (payload, _) = self.rb.read_async(self.read_timeout, &mut self.sig_conn).await?;
+			self.read_buf = payload;
+		}
+
+		let n = std::cmp::min(buf.len(), self.read_buf.len());
+		buf[..n].copy_from_slice(&self.read_buf[..n]);
+		self.read_buf.drain(..n);
+		Ok(n)
+	}
+
+	pub async fn read_exact(&mut self, buf: &mut [u8]) -> io::Result<()> {
+		let mut offset = 0;
+		while offset < buf.len() {
+			let n = self.read(&mut buf[offset..]).await?;
+			if n == 0 {
+				return Err(io::Error::new(io::ErrorKind::UnexpectedEof, "failed to fill whole buffer"));
+			}
+			offset += n;
+		}
+		Ok(())
+	}
+}
+
+pub async fn new_connection_async(
+	base_path: &str,
+	role: &str,
+	num_slots: usize,
+	slot_data_size: usize,
+	write_timeout: Duration,
+	read_timeout: Duration,
+) -> io::Result<(AsyncWriter, AsyncReader)> {
+	let sig_sock_path = format!("{}_sig.sock", base_path);
+
+	let write_path: String;
+	let read_path: String;
+
+	let (conn1, conn2) = if role == ROLE_HOST {
+		write_path = format!("{}_writer", base_path);
+		read_path = format!("{}_reader", base_path);
+
+		let _ = std::fs::remove_file(&sig_sock_path);
+		let listener = tokio::net::UnixListener::bind(&sig_sock_path)?;
+
+		let (conn1, _) = listener.accept().await?;
+		let (conn2, _) = listener.accept().await?;
+
+		(conn1, conn2)
+	} else if role == ROLE_PLUGIN {
+		write_path = format!("{}_reader", base_path);
+		read_path = format!("{}_writer", base_path);
+
+		let mut conn1 = None;
+		let mut conn2 = None;
+
+		for _ in 0..100 {
+			if let Ok(c) = tokio::net::UnixStream::connect(&sig_sock_path).await {
+				conn1 = Some(c);
+				break;
+			}
+			tokio::time::sleep(Duration::from_millis(10)).await;
+		}
+		let conn1 = conn1.ok_or_else(|| {
+			io::Error::new(io::ErrorKind::TimedOut, "plugin failed to dial first sig connection")
+		})?;
+
+		for _ in 0..100 {
+			if let Ok(c) = tokio::net::UnixStream::connect(&sig_sock_path).await {
+				conn2 = Some(c);
+				break;
+			}
+			tokio::time::sleep(Duration::from_millis(10)).await;
+		}
+		let conn2 = conn2.ok_or_else(|| {
+			io::Error::new(io::ErrorKind::TimedOut, "plugin failed to dial second sig connection")
+		})?;
+
+		(conn1, conn2)
+	} else {
+		return Err(io::Error::new(
+			io::ErrorKind::InvalidInput,
+			format!("invalid role: {}, must be 'Host' or 'Plugin'", role),
+		));
+	};
+
+	let mut write_rb = RingBuffer::new(&write_path, num_slots, slot_data_size)?;
+	write_rb.clear();
+
+	let read_rb = RingBuffer::new(&read_path, num_slots, slot_data_size)?;
+
+	let (writer, reader) = if role == ROLE_HOST {
+		(
+			AsyncWriter::new(write_rb, conn1, write_timeout),
+			AsyncReader::new(read_rb, conn2, read_timeout),
+		)
+	} else {
+		(
+			AsyncWriter::new(write_rb, conn2, write_timeout),
+			AsyncReader::new(read_rb, conn1, read_timeout),
 		)
 	};
 

@@ -7,6 +7,9 @@ from .ringbuf import (
     ROLE_PLUGIN,
     STATE_EMPTY,
     STATE_WRITTEN,
+    AsyncWriter,
+    AsyncReader,
+    async_new_connection,
 )
 
 __all__ = [
@@ -18,4 +21,7 @@ __all__ = [
     "ROLE_PLUGIN",
     "STATE_EMPTY",
     "STATE_WRITTEN",
+    "AsyncWriter",
+    "AsyncReader",
+    "async_new_connection",
 ]
